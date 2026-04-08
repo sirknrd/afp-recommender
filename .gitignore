@@ -1,12 +1,12 @@
+# Entornos virtuales
 .venv/
+env/
+venv/
+
+# Python cache
 __pycache__/
 *.pyc
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
+
+# Archivos de sistema
 .DS_Store
-*.csv
-!data/example_prices.csv
-dist/
-build/
-*.egg-info/
+Thumbs.db
