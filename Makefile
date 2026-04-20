@@ -1,7 +1,7 @@
 .PHONY: install train test docker lint clean
 
 install:
-	pip install -r requirements-fixed.txt
+	pip install -r requirements.txt
 
 train:
 	python train_fixed.py --epochs 50 --batch-size 64 --lr 1e-3
