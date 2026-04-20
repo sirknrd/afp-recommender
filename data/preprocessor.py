@@ -1,54 +1,68 @@
-"""
-AFP Dataset Preprocessor - Optimized
-"""
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler, PCA
-from sklearn.model_selection import train_test_split
-import torch
+import os
+import logging
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA  # ← AQUÍ ESTÁ LA FIX
 
-class AFPDataPreprocessor:
-    def __init__(self, n_components=32, test_size=0.2):
-        self.scaler = StandardScaler()
-        self.pca = PCA(n_components=n_components)
-        self.test_size = test_size
-        self.fitted = False
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def create_sample_data():
+    """Crea datos simulados AFP si no existen"""
+    logger.info("📊 Creando datos simulados AFP...")
+    np.random.seed(42)
+    n_samples = 5000
     
-    def fit_transform(self, data_path):
-        """Load and preprocess AFP data"""
-        # Load data (ajusta la ruta a tu dataset)
-        df = pd.read_csv(data_path)
-        
-        # Features y labels
-        X = df.drop('target', axis=1).values
-        y = df['target'].values.reshape(-1, 1)
-        
-        # Split
-        X_temp, X_test, y_temp, y_test = train_test_split(
-            X, y, test_size=self.test_size, random_state=42
-        )
-        
-        # Scale
-        X_temp_scaled = self.scaler.fit_transform(X_temp)
-        X_test_scaled = self.scaler.transform(X_test)
-        
-        # PCA
-        X_temp_pca = self.pca.fit_transform(X_temp_scaled)
-        X_test_pca = self.pca.transform(X_test_scaled)
-        
-        self.fitted = True
-        
-        # Reshape for LSTM [samples, timesteps, features]
-        X_train = X_temp_pca.reshape(-1, 20, X_temp_pca.shape[1])
-        X_test = X_test_pca.reshape(-1, 20, X_test_pca.shape[1])
-        
-        return (torch.FloatTensor(X_train), torch.FloatTensor(y_temp),
-                torch.FloatTensor(X_test), torch.FloatTensor(y_test))
+    df = pd.DataFrame({
+        'edad': np.random.randint(18, 70, n_samples),
+        'ingreso_mensual': np.random.lognormal(11, 0.4, n_samples),
+        'años_cotizando': np.random.randint(1, 40, n_samples),
+        'riesgo_perfil': np.random.choice([1, 2, 3, 4, 5], n_samples),
+        'fondo_actual': np.random.choice(['A', 'B', 'C', 'D', 'E'], n_samples),
+        'retorno_A': np.random.normal(0.07, 0.12, n_samples),
+        'retorno_B': np.random.normal(0.09, 0.15, n_samples),
+        'retorno_C': np.random.normal(0.11, 0.18, n_samples),
+        'retorno_D': np.random.normal(0.14, 0.22, n_samples),
+        'retorno_E': np.random.normal(0.17, 0.28, n_samples),
+    })
     
-    def transform(self, X):
-        """Transform new data"""
-        if not self.fitted:
-            raise ValueError("Must fit preprocessor first")
-        X_scaled = self.scaler.transform(X)
-        X_pca = self.pca.transform(X_scaled)
-        return X_pca.reshape(-1, 20, X_pca.shape[1])
+    os.makedirs('data/raw', exist_ok=True)
+    df.to_csv('data/raw/fondos_afp.csv', index=False)
+    logger.info(f"✅ {n_samples} registros creados")
+    return df
+
+def preprocess():
+    """Preprocesamiento completo"""
+    # Cargar/crear datos
+    try:
+        df = pd.read_csv('data/raw/fondos_afp.csv')
+    except:
+        df = create_sample_data()
+    
+    # Features
+    features = ['edad', 'ingreso_mensual', 'años_cotizando', 'riesgo_perfil',
+                'retorno_A', 'retorno_B', 'retorno_C', 'retorno_D', 'retorno_E']
+    
+    X = df[features].fillna(df[features].mean())
+    
+    # Escalado
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    
+    # PCA
+    pca = PCA(n_components=6)
+    X_pca = pca.fit_transform(X_scaled)
+    
+    # Guardar
+    os.makedirs('data/processed', exist_ok=True)
+    np.save('data/processed/X_processed.npy', X_pca)
+    np.save('data/processed/scaler.npy', scaler)
+    np.save('data/processed/pca.npy', pca)
+    
+    logger.info(f"✅ Preprocesado: {X_pca.shape}")
+    print("🎉 DATOS LISTOS PARA ENTRENAMIENTO")
+    return X_pca
+
+if __name__ == "__main__":
+    preprocess()
